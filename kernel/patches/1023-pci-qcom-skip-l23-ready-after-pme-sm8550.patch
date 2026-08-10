@@ -8,8 +8,8 @@ read wedges/faults), so system suspend never resumes. Confirmed needed:
 with the get_ltssm helper corrected to read PARF_LTSSM, suspend still
 crashes at the L2-wait; only skipping the poll lets it proceed.
 Set pp->skip_l23_ready so the DWC core waits a fixed delay for L2/L3
-entry instead of polling, matching i.MX6's handling. Companion to the
-d3cold backport + the get_ltssm helper fix.
+entry instead of polling, matching i.MX6's handling in Linux 7.2's D3cold
+suspend path.
 ---
 --- a/drivers/pci/controller/dwc/pcie-qcom.c
 +++ b/drivers/pci/controller/dwc/pcie-qcom.c

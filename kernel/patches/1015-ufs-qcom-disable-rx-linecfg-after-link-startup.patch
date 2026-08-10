@@ -146,16 +146,14 @@ Signed-off-by: jaewun <jaewun@users.noreply.github.com>
  		if (ufs_qcom_cfg_timers(hba, false, ULONG_MAX)) {
  			dev_err(hba->dev, "%s: ufs_qcom_cfg_timers() failed\n",
  				__func__);
-@@ -739,6 +746,12 @@ static int ufs_qcom_link_startup_notify(struct ufs_hba *hba,
- 		err = ufshcd_disable_host_tx_lcc(hba);
- 
+@@ -748,6 +756,10 @@ static int ufs_qcom_link_startup_notify(struct ufs_hba *hba,
  		break;
-+	case POST_CHANGE:
+ 	case POST_CHANGE:
+ 		ufs_qcom_link_startup_post_change(hba);
 +		linecfg_err = qcom_qmp_ufs_ctrl_rx_linecfg(host->generic_phy, false);
 +		if (linecfg_err && linecfg_err != -EOPNOTSUPP)
 +			dev_warn(hba->dev, "failed to disable RX LineCfg: %d\n",
 +				 linecfg_err);
-+		break;
+ 		break;
  	default:
  		break;
- 	}

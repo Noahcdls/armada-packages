@@ -7,10 +7,9 @@ error returns (reset_control_assert / reset_control_deassert failure) leave
 the IRQ disabled, leaking the disable depth and leaving the controller IRQ
 masked for the rest of the controller's life.
 
-The relink path can now mask the IRQ with disable_irq_nosync() while PM is in
-progress, so these error exits must preserve IRQ depth as well. Route both
-failures through a common exit that re-enables the IRQ when it was enabled on
-entry.
+These error exits must preserve IRQ depth just like the success path. Route
+both failures through a common exit that re-enables the IRQ when it was
+enabled on entry.
 
 Signed-off-by: jaewun <jaewun@users.noreply.github.com>
 ---
