@@ -287,10 +287,10 @@ Patch `1009` follows `1029` because it consumes the gated UFS state. Patches
   source: https://github.com/gh123man/armada-packages/commit/2275305ddea13abb59f9e428299f8c84dfafc79a
   upstream: unknown
   notes: Ported to Linux 7.2 without the obsolete relink poller; recovery remains limited to the gated SM8550 UFS path. #SM8550_SLEEP
-- `patches/1030-revert-pci-qcom-phy-parf-power-down-in-deinit.patch`
+- `patches/1031-revert-clk-regmap-phy-mux-rate-based-rework.patch`
   source: armada
-  upstream: revert of https://github.com/torvalds/linux/commit/8a847d3e9e5f1700beb5a0196e682f71837dfe5c
-  notes: New in Linux 7.2, that commit asserts PARF_PHY_CTRL.PHY_TEST_PWR_DOWN in the qcom PCIe deinit paths, which run on every boot probe-deferral unwind and across suspend/resume. On SM8550 (AYN Odin 2 Portal, WCN7850 on pcie0) 7.2 leaves the link stuck in LTSSM Detect while the powered endpoint asserts CLKREQ#; this commit is the prime suspect (the only behavioral boot-path change in pcie-qcom.c since 7.1.5) but not yet hardware-proven. Boot-path carry, deliberately not sleep-gated, applied to all controller variants. Drop if the A/B shows no change, or when upstream resolves the regression.
+  upstream: revert of https://github.com/torvalds/linux/commit/e108373c54fbc844b7f541c6fd7ecb31772afd3c
+  notes: Root-cause carry for the SM8550 Portal wifi regression. The reverted commit (patch 1 of the "phy_fastclk" series) switched the PCIe pipe-clock mux from enable/disable ops to rate-based ops, but the series' consumer patches never merged, so nothing in 7.2-rc7 can switch the mux to the PHY source. Boards handed over with the mux parked on XO (Portal: GCC_PCIE_0_PIPE_CLK_SRC = 0x2 at boot, hardware-read) then run the QMP PHY bring-up on the wrong pipe clock and the WCN7850 link never leaves Detect. Restoring the enable-op contract restores the working 7.1 behavior. Drop when upstream lands the consumer side or reverts the rework.
 - `patches/0001-pcie-update-sm8550-dtsi.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8550/patches/linux/0001-pcie-update-sm8550-dtsi.patch
   upstream: https://lore.kernel.org/r/20260611-wake-v2-33-2744251b1181@oss.qualcomm.com

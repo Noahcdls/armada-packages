@@ -102,7 +102,7 @@ v9_20260729_qualcomm_crypto_qce_runtime_pm_interconnect.patch
 1029-armada-gate-sm8550-native-sleep-workarounds.patch #SM8550_SLEEP
 1009-scsi-ufs-recover-hibern8-enter-clk-gating.patch #SM8550_SLEEP
 
-1030-revert-pci-qcom-phy-parf-power-down-in-deinit.patch
+1031-revert-clk-regmap-phy-mux-rate-based-rework.patch
 
 # ============== SM8550 DTSI prerequisites ==============
 0001-pcie-update-sm8550-dtsi.patch
