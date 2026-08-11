@@ -287,6 +287,10 @@ Patch `1009` follows `1029` because it consumes the gated UFS state. Patches
   source: https://github.com/gh123man/armada-packages/commit/2275305ddea13abb59f9e428299f8c84dfafc79a
   upstream: unknown
   notes: Ported to Linux 7.2 without the obsolete relink poller; recovery remains limited to the gated SM8550 UFS path. #SM8550_SLEEP
+- `patches/1030-revert-pci-qcom-phy-parf-power-down-in-deinit.patch`
+  source: armada
+  upstream: revert of https://github.com/torvalds/linux/commit/8a847d3e9e5f1700beb5a0196e682f71837dfe5c
+  notes: New in Linux 7.2, that commit asserts PARF_PHY_CTRL.PHY_TEST_PWR_DOWN in the qcom PCIe deinit paths, which run on every boot probe-deferral unwind and across suspend/resume. On SM8550 (AYN Odin 2 Portal, WCN7850 on pcie0) 7.2 leaves the link stuck in LTSSM Detect while the powered endpoint asserts CLKREQ#; this commit is the prime suspect (the only behavioral boot-path change in pcie-qcom.c since 7.1.5) but not yet hardware-proven. Boot-path carry, deliberately not sleep-gated, applied to all controller variants. Drop if the A/B shows no change, or when upstream resolves the regression.
 - `patches/0001-pcie-update-sm8550-dtsi.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8550/patches/linux/0001-pcie-update-sm8550-dtsi.patch
   upstream: https://lore.kernel.org/r/20260611-wake-v2-33-2744251b1181@oss.qualcomm.com
