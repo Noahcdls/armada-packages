@@ -6,6 +6,107 @@ commit, or `armada` for original work; a URL source with no `notes` is verbatim.
 A patch entry's `upstream` is `local` for an Armada-authored change, `unknown` when
 no equivalent submission was found, or a permanent URL to the upstream submission.
 
+- `patches/1400-sched-core-fix-inter-class-wakeup-preempt.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/05f54edb1cd43ad3b0b9bb4c4392a6969efd5cb8
+  upstream: https://patch.msgid.link/20260626074605.GB2568396%40noisy.programming.kicks-ass.net
+  notes: First of the contiguous 33-patch Linux 7.3 scheduler backport from OpenGamingCollective/linux#95; retain the block's order in `patches/series`.
+- `patches/1401-sched-fair-fix-update-tg-cfs-runnable-overflow.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/3a74b9d63eb84dfe17cd3e1d786b0bb3b1c9cebe
+  upstream: https://patch.msgid.link/a22eea2b-4c4a-4623-9a44-d7b18c0c91c8@intel.com
+- `patches/1402-sched-fair-add-cgroup-mode-switch.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/38b901c4378ee28b699a09c06b2772b4e72dcd6f
+  upstream: https://patch.msgid.link/20260605124051.338602724%40infradead.org
+- `patches/1403-sched-fair-add-cgroup-mode-up.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/be4643009e5d03599f8c5dc5c3b489c0034c3a8f
+  upstream: https://patch.msgid.link/20260605124051.450303977%40infradead.org
+- `patches/1404-sched-fair-add-cgroup-mode-max.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/34c6668e88fbe52ca39856cedf0f60f3349a5602
+  upstream: https://patch.msgid.link/20260605124051.589618504%40infradead.org
+- `patches/1405-sched-fair-add-cgroup-mode-concur.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/8eb4373a37798a2b4aa357764ba8432171575ffe
+  upstream: https://patch.msgid.link/20260605124051.740585993%40infradead.org
+- `patches/1406-sched-fair-add-cgroup-mode-tasks.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/3b05fef7ce94450a9a1d91a6fd7e33394e7b6624
+  upstream: https://patch.msgid.link/20260605124051.921991975%40infradead.org
+- `patches/1407-sched-fair-default-cgroup-mode-concur.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/35f0d0e40b10e0be3bc3c7bf2e5ca5e9c65a124f
+  upstream: https://patch.msgid.link/20260605124052.080482755%40infradead.org
+- `patches/1408-sched-eevdf-move-to-single-runqueue.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/3f9ac56b1abec91155ab443e3ba39f63983a2f83
+  upstream: https://patch.msgid.link/20260605124052.227463677%40infradead.org
+- `patches/1409-sched-fair-remove-unused-set-preempt-buddy-args.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/33c4856f1db656b7681f51391d8d190eb6f52f4a
+  upstream: unknown
+- `patches/1410-sched-fair-set-next-buddy-for-preempt-short.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/3825b6da05cc5e3a3089de25839d4e69ade13700
+  upstream: https://patch.msgid.link/20260624151229.1710703-2-vincent.guittot@linaro.org
+- `patches/1411-sched-eevdf-account-current-lag-in-slice-protection.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/940d7d7d505ec661b4c5c6985527344727c81237
+  upstream: https://patch.msgid.link/20260624151229.1710703-3-vincent.guittot@linaro.org
+- `patches/1412-sched-eevdf-update-slice-protection-when-resched-set.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/eba0e6d2f81b4769417e6f3778b862b0b1a40958
+  upstream: https://patch.msgid.link/20260624151229.1710703-4-vincent.guittot@linaro.org
+- `patches/1413-sched-eevdf-cancel-slice-protection-for-short-task.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/ce86e3cdc8482bdc53cd78a808032bf3ffc96649
+  upstream: https://patch.msgid.link/20260624151229.1710703-5-vincent.guittot@linaro.org
+- `patches/1414-sched-eevdf-always-update-slice-protection.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/ab63e0a618c42d344e9a0728ee8d8f27a5550e21
+  upstream: https://patch.msgid.link/20260624151229.1710703-6-vincent.guittot@linaro.org
+- `patches/1415-sched-eevdf-speed-up-short-slice-scheduling.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/adc02c201cedd2c5a0e0bca62e7d80c320a789b7
+  upstream: https://patch.msgid.link/20260624151229.1710703-7-vincent.guittot@linaro.org
+- `patches/1416-sched-fair-skip-active-lb-for-off-rq-current.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/40d72de322dff3eedf3e681180764178c89dc408
+  upstream: https://patch.msgid.link/20260617072151.1173416-2-jackzxcui1989@163.com
+- `patches/1417-sched-fair-simplify-balance-interval-reset.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/f369535c2ccff975d4a6204b0c6355ef1fe388ab
+  upstream: https://patch.msgid.link/20260617072151.1173416-3-jackzxcui1989@163.com
+- `patches/1418-sched-fair-reflow-sched-balance-rq.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/9ab743a8ddad67dd83492f3ff5247d3e90935936
+  upstream: https://patch.msgid.link/20260618105627.GP49951@noisy.programming.kicks-ass.net
+- `patches/1419-sched-psi-skip-empty-irqtime-accounting.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/6e06edfbf0a02361db4623359a7ebc3bf9d52265
+  upstream: https://patch.msgid.link/20260617175219.2494857-2-usama.arif@linux.dev
+- `patches/1420-sched-debug-remove-unused-schedstats.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/b7abd15798ef538992a7b6f5ea4523161345a3a8
+  upstream: https://patch.msgid.link/20260625124648.802832-2-sshegde@linux.ibm.com
+- `patches/1421-sched-fair-fix-stale-cfs-comments.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/110c0eaee522a357c97e68de2a9b9354dd20e2e7
+  upstream: https://patch.msgid.link/20260629030200.3165589-1-zhanxusheng@xiaomi.com
+- `patches/1422-sched-eevdf-delayed-dequeue-cannot-preempt.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/258656f8711993877d2623e0c7ca8186cf3a520e
+  upstream: https://patch.msgid.link/20260701164920.1571352-1-vincent.guittot@linaro.org
+- `patches/1423-stop-machine-make-stop-one-cpu-nowait-void.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/9994fe886b04449acb87a8acc7e1a9ca22ec8741
+  upstream: https://patch.msgid.link/20260729022355.325058-1-ynorov@nvidia.com
+- `patches/1424-sched-fair-prefer-idle-cores-for-nohz.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/9ae2e253c388b8e5ddcd28b4099a7766c257726b
+  upstream: https://patch.msgid.link/20260804151324.918020-1-arighi@nvidia.com
+- `patches/1425-sched-fair-allow-similar-capacity-busy-smt.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/ed3458ec5afebaebd2d63ca0406e877177e37a55
+  upstream: https://patch.msgid.link/20260720-rneri-fix-cas-clusters-v6-1-bb500bf4afd4@linux.intel.com
+- `patches/1426-sched-fair-gate-overloaded-status-for-asym-capacity.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/d59317f7ea6bead7adfffe81ed80f596aa6045e0
+  upstream: https://patch.msgid.link/20260720-rneri-fix-cas-clusters-v6-2-bb500bf4afd4@linux.intel.com
+- `patches/1427-sched-fair-check-capacity-before-group-type.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/f94012eabee38e1cf3e8f8b944bb754a1c7b928b
+  upstream: https://patch.msgid.link/20260720-rneri-fix-cas-clusters-v6-3-bb500bf4afd4@linux.intel.com
+- `patches/1428-sched-fair-skip-unhelpful-misfit-accounting.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/b0efdde1033c281c49171e0a376f7f58203fa98f
+  upstream: https://patch.msgid.link/20260720-rneri-fix-cas-clusters-v6-4-bb500bf4afd4@linux.intel.com
+- `patches/1429-sched-fair-balance-identical-capacity-cpus.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/e2465efcdb2e449e374aec9c5177803f5013501b
+  upstream: https://patch.msgid.link/20260720-rneri-fix-cas-clusters-v6-5-bb500bf4afd4@linux.intel.com
+- `patches/1430-sched-topology-restore-prefer-sibling-on-asym.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/b3accb378158549f0062acb009874bf93244d720
+  upstream: https://patch.msgid.link/20260720-rneri-fix-cas-clusters-v6-6-bb500bf4afd4@linux.intel.com
+- `patches/1431-sched-isolation-defer-cpumask-memblock-free.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/d0a4d664d591d54c40248c9f00503072c764fa44
+  upstream: https://patch.msgid.link/20260701195810.477326-1-longman@redhat.com
+- `patches/1432-sched-fair-fix-flat-hierarchy.patch`
+  source: https://github.com/OpenGamingCollective/linux/commit/a4e6fd9ed3a77eae39fb6ff05a35bdbf348bf861
+  upstream: https://patch.msgid.link/20260812125039.1717249-1-vincent.guittot@linaro.org
+
 - `patches/0002-qcom-dispcc-sm8550-Fix-disp_cc_mdss_mdp_clk_src.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8550/patches/linux/0002-qcom-dispcc-sm8550-Fix-disp_cc_mdss_mdp_clk_src.patch
   upstream: unknown
