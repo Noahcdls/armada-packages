@@ -1,0 +1,445 @@
+From: virtudude <virtudude@protonmail.com>
+Subject: [PATCH] steamcompmgr: add software dimming
+
+The GAMESCOPE_SOFTWARE_DIMMING atom carries a backlight floor, clamped to
+the backlight maximum. Requests at or above it pass through untouched;
+below it the panel is held at the floor and the remainder is rendered as a
+digital dim factor, luminance-matched to the panel's response so the
+slider keeps its perceived scale. AMOLED DDICs track worst at low drive,
+crushing shadows and desaturating; holding the panel at the floor
+preserves channel ratios and near-black separation at a code-range cost
+the output dither covers.
+
+The factor applies to Gamma 2.2 encoded outputs, on the PQ path after
+tone mapping so highlights dim uniformly, and Vulkan composition is
+forced while it is active so direct scanout cannot bypass it. Write
+failures leave the mode inert or hold the previous pin while the panel
+provably still shows it; the saved request is restored once it no longer
+falls below the floor or the floor is cleared.
+
+The backlight device defaults to the first entry in /sys/class/backlight
+and can be selected with GAMESCOPE_SOFTWARE_DIMMING_BACKLIGHT.
+
+diff --git a/src/Backends/DRMBackend.cpp b/src/Backends/DRMBackend.cpp
+index 9965c94..5561bd6 100644
+--- a/src/Backends/DRMBackend.cpp
++++ b/src/Backends/DRMBackend.cpp
+@@ -4269,6 +4269,7 @@ namespace gamescope
+ 			bNeedsFullComposite |= g_bColorSliderInUse;
+ 			bNeedsFullComposite |= pFrameInfo->bFadingOut;
+ 			bNeedsFullComposite |= !g_reshade_effect.empty();
++			bNeedsFullComposite |= g_bSoftwareDimmingCompositeForce;
+ 
+ 			if ( g_bOutputHDREnabled )
+ 			{
+diff --git a/src/SoftwareDimming.h b/src/SoftwareDimming.h
+new file mode 100644
+index 0000000..465a15f
+--- /dev/null
++++ b/src/SoftwareDimming.h
+@@ -0,0 +1,63 @@
++#pragma once
++
++#include <algorithm>
++#include <cmath>
++
++namespace gamescope
++{
++    // Pin one step below the floor so a genuine floor-value write from the
++    // client stays distinguishable from the pin echo.
++    constexpr int SoftwareDimPinDBV( int nFloorDBV )
++    {
++        return nFloorDBV - 1;
++    }
++
++    constexpr bool SoftwareDimIsNewIntent( int nValueDBV, int nFloorDBV )
++    {
++        return nValueDBV != SoftwareDimPinDBV( nFloorDBV );
++    }
++
++    // Proves the panel still shows the old pin, not merely that a pin existed.
++    constexpr bool SoftwareDimOldPinEcho( bool bPinned, int nValueDBV, int nPinnedFloorDBV )
++    {
++        return bPinned && nValueDBV == SoftwareDimPinDBV( nPinnedFloorDBV );
++    }
++
++    struct SoftwareDimDecision
++    {
++        int nIntentDBV;
++        bool bWantPin;
++        bool bWriteIntent;
++        bool bUnpin;
++    };
++
++    // Echo detection keys on the floor that performed the active pin, so a
++    // floor change cannot turn the old pin value into a stored intent.
++    constexpr SoftwareDimDecision SoftwareDimDecide(
++        int nValueDBV,
++        int nFloorDBV,
++        bool bPinned,
++        int nPinnedFloorDBV,
++        int nIntentDBV )
++    {
++        int nEchoFloor = bPinned ? nPinnedFloorDBV : nFloorDBV;
++        if ( SoftwareDimIsNewIntent( nValueDBV, nEchoFloor ) )
++            nIntentDBV = nValueDBV;
++
++        if ( nIntentDBV < nFloorDBV )
++            return { nIntentDBV, true, false, false };
++
++        return { nIntentDBV, false, bPinned && nValueDBV != nIntentDBV, bPinned };
++    }
++
++    // Panel luminance tracks roughly (dbv/max)^2.2; the factor reproduces the
++    // requested level from the floor's, held above the darkest usable output.
++    inline float SoftwareDimFactor( int nIntentDBV, int nFloorDBV, int nMaxDBV )
++    {
++        if ( nMaxDBV <= 0 || nFloorDBV < 2 || nIntentDBV >= nFloorDBV )
++            return 1.0f;
++        float flTarget = std::max( std::pow( float( std::max( nIntentDBV, 0 ) ) / float( nMaxDBV ), 2.2f ), 0.005f );
++        float flFloorLum = std::pow( float( std::min( nFloorDBV, nMaxDBV ) ) / float( nMaxDBV ), 2.2f );
++        return std::clamp( flTarget / flFloorLum, 0.0f, 1.0f );
++    }
++}
+diff --git a/src/rendervulkan.hpp b/src/rendervulkan.hpp
+index 7bbf46f..381a444 100644
+--- a/src/rendervulkan.hpp
++++ b/src/rendervulkan.hpp
+@@ -450,6 +450,7 @@ struct gamescope_color_mgmt_t
+ 	float flSDROnHDRBrightness = 203.f;
+ 	float flHDRInputGain = 1.f;
+ 	float flSDRInputGain = 1.f;
++	float flSoftwareDimFactor = 1.f;
+ 
+ 	// HDR Display Metadata Override & Tonemapping
+ 	ETonemapOperator hdrTonemapOperator = ETonemapOperator_None;
+diff --git a/src/steamcompmgr.cpp b/src/steamcompmgr.cpp
+index 2c74605..dce81cc 100644
+--- a/src/steamcompmgr.cpp
++++ b/src/steamcompmgr.cpp
+@@ -32,6 +32,10 @@
+ #include "backend.h"
+ #include "HDRGamma22.h"
+ #include "HDRTonemap.h"
++#include "SoftwareDimming.h"
++
++#include <dirent.h>
++#include <fcntl.h>
+ #include "gamescope_shared.h"
+ #include "xwayland_ctx.hpp"
+ #include <X11/X.h>
+@@ -162,6 +166,8 @@ static lut3d_t g_tmpLut3d;
+ extern int g_nDynamicRefreshHz;
+ 
+ bool g_bForceHDRSupportDebug = false;
++static int g_nSoftwareDimmingFloorDBV = 0;
++bool g_bSoftwareDimmingCompositeForce = false;
+ extern bool g_bAppWantsHDRCached;
+ extern float g_flInternalDisplayBrightnessNits;
+ extern float g_flHDRItmSdrNits;
+@@ -372,6 +378,7 @@ create_color_mgmt_luts(
+ 						newColorMgmt.outputEncodingEOTF,
+ 						newColorMgmt.flSDROnHDRBrightness,
+ 						newColorMgmt.flInternalDisplayBrightness );
++					flGain *= newColorMgmt.flSoftwareDimFactor;
+ 					tonemapping.g22_luminance = 1.f;
+ 					// xwm_log.infof("G22 -> G22");
+ 				}
+@@ -393,7 +400,7 @@ create_color_mgmt_luts(
+ 				if ( newColorMgmt.outputEncodingEOTF == EOTF_Gamma22 )
+ 				{
+ 					// PQ -> G22  Leverage the display's native brightness
+-					tonemapping.g22_luminance = newColorMgmt.flInternalDisplayBrightness;
++					tonemapping.g22_luminance = newColorMgmt.flInternalDisplayBrightness / newColorMgmt.flSoftwareDimFactor;
+ 
+ 					// Determine the tonemapping parameters
+ 					// Use the external atoms if provided
+@@ -6476,6 +6483,11 @@ handle_property_notify(xwayland_ctx_t *ctx, XPropertyEvent *ev)
+ 		g_ColorMgmt.pending.bHdrTonemapOperatorSet = ev->state == PropertyNewValue;
+ 		hasRepaint = true;
+ 	}
++	if ( ev->atom == ctx->atoms.gamescopeSoftwareDimming )
++	{
++		g_nSoftwareDimmingFloorDBV = ev->state == PropertyNewValue ?
++			(int)get_prop( ctx, ctx->root, ctx->atoms.gamescopeSoftwareDimming, 0 ) : 0;
++	}
+ 
+ 	if ( ev->atom == ctx->atoms.gamescopeHDRTonemapDisplayMetadata )
+ 	{
+@@ -8004,6 +8016,7 @@ void init_xwayland_ctx(uint32_t serverId, gamescope_xwayland_server_t *xwayland_
+ 	ctx->atoms.gamescopeHDRTonemapDisplayMetadata = XInternAtom( ctx->dpy, "GAMESCOPE_HDR_TONEMAP_DISPLAY_METADATA", false );
+ 	ctx->atoms.gamescopeHDRTonemapSourceMetadata = XInternAtom( ctx->dpy, "GAMESCOPE_HDR_TONEMAP_SOURCE_METADATA", false );
+ 	ctx->atoms.gamescopeHDRTonemapOperator = XInternAtom( ctx->dpy, "GAMESCOPE_HDR_TONEMAP_OPERATOR", false );
++	ctx->atoms.gamescopeSoftwareDimming = XInternAtom( ctx->dpy, "GAMESCOPE_SOFTWARE_DIMMING", false );
+ 
+ 	ctx->atoms.gamescopeForceWindowsFullscreen = XInternAtom( ctx->dpy, "GAMESCOPE_FORCE_WINDOWS_FULLSCREEN", false );
+ 
+@@ -8226,6 +8239,135 @@ static bool g_bWasFSRActive = false;
+ 
+ bool g_bAppWantsHDRCached = false;
+ 
++static struct
++{
++	bool bResolved = false;
++	bool bPinned = false;
++	int nMaxDBV = 0;
++	int nIntentDBV = 0;
++	int nPinnedFloorDBV = 0;
++	char szBrightness[600];
++} s_SoftwareDim;
++
++static int software_dimming_read_int( const char *path )
++{
++	int v = -1;
++	if ( FILE *f = fopen( path, "r" ) )
++	{
++		if ( fscanf( f, "%d", &v ) != 1 )
++			v = -1;
++		fclose( f );
++	}
++	return v;
++}
++
++static bool software_dimming_write_int( const char *path, int value )
++{
++	int fd = open( path, O_WRONLY | O_CLOEXEC );
++	if ( fd < 0 )
++		return false;
++	char szBuf[16];
++	int n = snprintf( szBuf, sizeof(szBuf), "%d", value );
++	bool bOk = write( fd, szBuf, n ) == n;
++	close( fd );
++	return bOk;
++}
++
++static bool software_dimming_resolve()
++{
++	if ( s_SoftwareDim.bResolved )
++		return true;
++
++	char szDir[512] = "";
++	const char *pszName = getenv( "GAMESCOPE_SOFTWARE_DIMMING_BACKLIGHT" );
++	if ( pszName && *pszName )
++	{
++		snprintf( szDir, sizeof(szDir), "/sys/class/backlight/%s", pszName );
++	}
++	else if ( DIR *dir = opendir( "/sys/class/backlight" ) )
++	{
++		while ( struct dirent *ent = readdir( dir ) )
++		{
++			if ( ent->d_name[0] == '.' )
++				continue;
++			snprintf( szDir, sizeof(szDir), "/sys/class/backlight/%s", ent->d_name );
++			break;
++		}
++		closedir( dir );
++	}
++	if ( !szDir[0] )
++		return false;
++
++	char szMax[600];
++	snprintf( szMax, sizeof(szMax), "%s/max_brightness", szDir );
++	snprintf( s_SoftwareDim.szBrightness, sizeof(s_SoftwareDim.szBrightness), "%s/brightness", szDir );
++	s_SoftwareDim.nMaxDBV = software_dimming_read_int( szMax );
++	if ( s_SoftwareDim.nMaxDBV <= 0 )
++		return false;
++	s_SoftwareDim.bResolved = true;
++	return true;
++}
++
++static void software_dimming_update()
++{
++	static uint64_t ulLastPoll = 0;
++	uint64_t now = get_time_in_nanos();
++	if ( now - ulLastPoll < 8'000'000ul )
++		return;
++	ulLastPoll = now;
++
++	int nFloor = g_nSoftwareDimmingFloorDBV;
++	float flFactor = 1.0f;
++
++	if ( nFloor >= 2 && software_dimming_resolve() )
++	{
++		nFloor = std::min( nFloor, s_SoftwareDim.nMaxDBV );
++		int nValue = software_dimming_read_int( s_SoftwareDim.szBrightness );
++		if ( nValue >= 0 )
++		{
++			gamescope::SoftwareDimDecision d = gamescope::SoftwareDimDecide(
++				nValue, nFloor, s_SoftwareDim.bPinned, s_SoftwareDim.nPinnedFloorDBV, s_SoftwareDim.nIntentDBV );
++			s_SoftwareDim.nIntentDBV = d.nIntentDBV;
++
++			if ( d.bWantPin )
++			{
++				bool bNeedWrite = nValue != gamescope::SoftwareDimPinDBV( nFloor );
++				if ( !bNeedWrite || software_dimming_write_int( s_SoftwareDim.szBrightness, gamescope::SoftwareDimPinDBV( nFloor ) ) )
++				{
++					s_SoftwareDim.bPinned = true;
++					s_SoftwareDim.nPinnedFloorDBV = nFloor;
++					flFactor = gamescope::SoftwareDimFactor( s_SoftwareDim.nIntentDBV, nFloor, s_SoftwareDim.nMaxDBV );
++				}
++				else if ( gamescope::SoftwareDimOldPinEcho( s_SoftwareDim.bPinned, nValue, s_SoftwareDim.nPinnedFloorDBV ) )
++				{
++					flFactor = gamescope::SoftwareDimFactor( s_SoftwareDim.nIntentDBV, s_SoftwareDim.nPinnedFloorDBV, s_SoftwareDim.nMaxDBV );
++				}
++				else
++				{
++					s_SoftwareDim.bPinned = false;
++				}
++			}
++			else if ( d.bUnpin )
++			{
++				if ( !d.bWriteIntent || software_dimming_write_int( s_SoftwareDim.szBrightness, s_SoftwareDim.nIntentDBV ) )
++					s_SoftwareDim.bPinned = false;
++			}
++		}
++	}
++	else if ( s_SoftwareDim.bPinned )
++	{
++		if ( software_dimming_write_int( s_SoftwareDim.szBrightness, s_SoftwareDim.nIntentDBV ) )
++			s_SoftwareDim.bPinned = false;
++	}
++
++	g_bSoftwareDimmingCompositeForce = flFactor != 1.0f;
++	if ( g_ColorMgmt.pending.flSoftwareDimFactor != flFactor )
++	{
++		g_ColorMgmt.pending.flSoftwareDimFactor = flFactor;
++		hasRepaint = true;
++	}
++}
++
+ void steamcompmgr_check_xdg(bool vblank, uint64_t vblank_idx)
+ {
+ 	if (wlserver_xdg_dirty())
+@@ -8991,6 +9133,8 @@ steamcompmgr_main(int argc, char **argv)
+ 				check_new_xwayland_res(server->ctx.get());
+ 		}
+ 
++		software_dimming_update();
++
+ 
+ 		{
+ 			GamescopeAppTextureColorspace current_app_colorspace = GAMESCOPE_APP_TEXTURE_COLORSPACE_SRGB;
+diff --git a/src/steamcompmgr.hpp b/src/steamcompmgr.hpp
+index 6734c15..dd171fc 100644
+--- a/src/steamcompmgr.hpp
++++ b/src/steamcompmgr.hpp
+@@ -39,6 +39,7 @@ static const uint32_t g_zposCursor = 4;
+ static const uint32_t g_zposMuraCorrection = 5;
+ 
+ extern bool g_bHDRItmEnable;
++extern bool g_bSoftwareDimmingCompositeForce;
+ extern bool g_bForceHDRSupportDebug;
+ 
+ extern EStreamColorspace g_ForcedNV12ColorSpace;
+diff --git a/src/xwayland_ctx.hpp b/src/xwayland_ctx.hpp
+index 978728a..ea3d987 100644
+--- a/src/xwayland_ctx.hpp
++++ b/src/xwayland_ctx.hpp
+@@ -219,6 +219,7 @@ struct xwayland_ctx_t final : public gamescope::IWaitable
+ 		Atom gamescopeHDRTonemapDisplayMetadata;
+ 		Atom gamescopeHDRTonemapSourceMetadata;
+ 		Atom gamescopeHDRTonemapOperator;
++		Atom gamescopeSoftwareDimming;
+ 
+ 		Atom gamescopeForceWindowsFullscreen;
+ 
+diff --git a/tests/test_drm_composition.cpp b/tests/test_drm_composition.cpp
+index a08d192..46931b6 100644
+--- a/tests/test_drm_composition.cpp
++++ b/tests/test_drm_composition.cpp
+@@ -4,6 +4,7 @@
+ #include "Backends/DRMComposition.h"
+ #include "HDRGamma22.h"
+ #include "HDRTonemap.h"
++#include "SoftwareDimming.h"
+ 
+ #include <cmath>
+ 
+@@ -90,3 +91,87 @@ TEST_CASE("Synthesized tonemap configs keep the EETF finite", "[color][hdr]")
+     for ( float flNits : { 0.001f, 0.01f, 1.0f, 100.0f, 650.0f, 2000.0f, 3000.0f } )
+         REQUIRE( std::isfinite( eetf.apply_max_rgb( glm::vec3( flNits ) ).r ) );
+ }
++
++TEST_CASE("Software dim factor engages below the floor only", "[color]")
++{
++    REQUIRE( SoftwareDimFactor( 4096, 4096, 4096 ) == 1.0f );
++    REQUIRE( SoftwareDimFactor( 40, 4096, 4096 ) == 0.005f );
++    REQUIRE( SoftwareDimFactor( 0, 4096, 4096 ) == 0.005f );
++    REQUIRE( SoftwareDimFactor( 2048, 4096, 4096 ) > SoftwareDimFactor( 1024, 4096, 4096 ) );
++
++    REQUIRE( SoftwareDimFactor( 512, 1024, 4096 ) < 0.25f );
++    REQUIRE( SoftwareDimFactor( 512, 1024, 4096 ) > 0.20f );
++    REQUIRE( SoftwareDimFactor( 1022, 1024, 4096 ) > 0.99f );
++    REQUIRE( SoftwareDimFactor( 1024, 1024, 4096 ) == 1.0f );
++
++    REQUIRE( SoftwareDimFactor( 1024, 0, 4096 ) == 1.0f );
++    REQUIRE( SoftwareDimFactor( 1024, 1, 4096 ) == 1.0f );
++    REQUIRE( SoftwareDimFactor( 512, 1024, 0 ) == 1.0f );
++
++    REQUIRE( SoftwareDimIsNewIntent( 1024, 1024 ) );
++    REQUIRE( SoftwareDimIsNewIntent( 40, 1024 ) );
++    REQUIRE_FALSE( SoftwareDimIsNewIntent( 1023, 1024 ) );
++}
++
++TEST_CASE("Software dim transitions survive floor changes while pinned", "[color]")
++{
++    auto d = SoftwareDimDecide( 1023, 2048, true, 1024, 40 );
++    REQUIRE( d.nIntentDBV == 40 );
++    REQUIRE( d.bWantPin );
++
++    d = SoftwareDimDecide( 1023, 512, true, 1024, 700 );
++    REQUIRE( d.nIntentDBV == 700 );
++    REQUIRE_FALSE( d.bWantPin );
++    REQUIRE( d.bUnpin );
++    REQUIRE( d.bWriteIntent );
++
++    d = SoftwareDimDecide( 1023, 512, true, 1024, 40 );
++    REQUIRE( d.nIntentDBV == 40 );
++    REQUIRE( d.bWantPin );
++
++    d = SoftwareDimDecide( 2000, 1024, true, 1024, 40 );
++    REQUIRE( d.nIntentDBV == 2000 );
++    REQUIRE( d.bUnpin );
++    REQUIRE_FALSE( d.bWriteIntent );
++
++    d = SoftwareDimDecide( 1023, 1024, true, 1024, 40 );
++    REQUIRE( d.nIntentDBV == 40 );
++    REQUIRE( d.bWantPin );
++
++    d = SoftwareDimDecide( 200, 1024, false, 0, 0 );
++    REQUIRE( d.nIntentDBV == 200 );
++    REQUIRE( d.bWantPin );
++
++    d = SoftwareDimDecide( 200, 1024, true, 1024, 500 );
++    REQUIRE( d.nIntentDBV == 200 );
++    REQUIRE( d.bWantPin );
++}
++
++TEST_CASE("Failed re-pin on a floor change preserves intent across polls", "[color]")
++{
++    auto d1 = SoftwareDimDecide( 1023, 2048, true, 1024, 40 );
++    REQUIRE( d1.nIntentDBV == 40 );
++    REQUIRE( d1.bWantPin );
++
++    auto d2 = SoftwareDimDecide( 1023, 2048, true, 1024, d1.nIntentDBV );
++    REQUIRE( d2.nIntentDBV == 40 );
++    REQUIRE( d2.bWantPin );
++
++    auto d3 = SoftwareDimDecide( 1023, 512, true, 1024, 40 );
++    REQUIRE( d3.nIntentDBV == 40 );
++    auto d4 = SoftwareDimDecide( 1023, 512, true, 1024, d3.nIntentDBV );
++    REQUIRE( d4.nIntentDBV == 40 );
++}
++
++TEST_CASE("Old pin state survives failure only while its echo is visible", "[color]")
++{
++    REQUIRE( SoftwareDimOldPinEcho( true, 1023, 1024 ) );
++
++    REQUIRE_FALSE( SoftwareDimOldPinEcho( true, 200, 1024 ) );
++    REQUIRE_FALSE( SoftwareDimOldPinEcho( true, 2047, 1024 ) );
++    REQUIRE_FALSE( SoftwareDimOldPinEcho( false, 1023, 1024 ) );
++
++    auto d = SoftwareDimDecide( 200, 1024, false, 0, 200 );
++    REQUIRE( d.nIntentDBV == 200 );
++    REQUIRE( d.bWantPin );
++}
