@@ -332,7 +332,7 @@
 		cpu { sound-dai = <&q6apmbedai DISPLAY_PORT_RX_0>; };
 		platform { sound-dai = <&q6apm>; };
 	};
-}
+};
 
 /*
  * AYN Odin 3 has two extra back paddles (M1, M2) below the shoulder
