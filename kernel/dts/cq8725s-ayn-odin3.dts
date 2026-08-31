@@ -32,6 +32,61 @@
 		gpio = <&tlmm 97 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 	};
+
+	/*
+	* AYN Odin 3 has two extra back paddles (M1, M2) below the shoulder
+	* triggers. They are plain active-low SoC TLMM GPIOs (M1 = GPIO_3,
+	* M2 = GPIO_7), not on the gamepad MCU UART and not ADC (despite AYN's
+	* Android "adckey"/keydetect.ko naming). Expose them as a gpio-keys
+	* device emitting BTN_Z (M1, left) / BTN_C (M2, right); ROCKNIX's
+	* InputPlumber map (ayn_mcu.yaml) already routes BTN_Z -> LeftPaddle1 and
+	* BTN_C -> RightPaddle1. RE'd from the AYN Android keydetect driver
+	* (gpio_request 515/519 = TLMM base 512 + offsets 3/7).
+	*/
+	gpio-keys-paddles {
+		compatible = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&paddle_keys_default>;
+
+		key-paddle-m1 {
+			label = "Back Paddle M1";
+			linux,code = <BTN_Z>;
+			gpios = <&tlmm 3 GPIO_ACTIVE_LOW>;
+			debounce-interval = <15>;
+		};
+
+		key-paddle-m2 {
+			label = "Back Paddle M2";
+			linux,code = <BTN_C>;
+			gpios = <&tlmm 7 GPIO_ACTIVE_LOW>;
+			debounce-interval = <15>;
+		};
+	};
+
+	&sound {
+        /* HDMI audio out over USB-C DP alt mode.
+         * The codec side is the hdmi-codec the DP bridge registers as a
+         * child of &mdss_dp0, and this link is also what makes the
+         * machine driver create the "DP0 Jack" control that UCM keys the
+         * HDMI device off.
+         * Needs the DISPLAY_PORT_RX_0 graph in the topology blob.
+         */
+        dp-dai-link {
+            link-name = "DisplayPort Playback";
+
+            codec {
+                sound-dai = <&mdss_dp0>;
+            };
+
+            cpu {
+                sound-dai = <&q6apmbedai DISPLAY_PORT_RX_0>;
+            };
+
+            platform {
+                sound-dai = <&q6apm>;
+            };
+        };
+    };
 };
 
 &i2c4 {
@@ -317,51 +372,4 @@
 		bias-pull-up;
 		drive-strength = <2>;
 	};
-};
-
-/*
- * AYN Odin 3 has two extra back paddles (M1, M2) below the shoulder
- * triggers. They are plain active-low SoC TLMM GPIOs (M1 = GPIO_3,
- * M2 = GPIO_7), not on the gamepad MCU UART and not ADC (despite AYN's
- * Android "adckey"/keydetect.ko naming). Expose them as a gpio-keys
- * device emitting BTN_Z (M1, left) / BTN_C (M2, right); ROCKNIX's
- * InputPlumber map (ayn_mcu.yaml) already routes BTN_Z -> LeftPaddle1 and
- * BTN_C -> RightPaddle1. RE'd from the AYN Android keydetect driver
- * (gpio_request 515/519 = TLMM base 512 + offsets 3/7).
- */
-/ {
-	gpio-keys-paddles {
-		compatible = "gpio-keys";
-		pinctrl-names = "default";
-		pinctrl-0 = <&paddle_keys_default>;
-
-		key-paddle-m1 {
-			label = "Back Paddle M1";
-			linux,code = <BTN_Z>;
-			gpios = <&tlmm 3 GPIO_ACTIVE_LOW>;
-			debounce-interval = <15>;
-		};
-
-		key-paddle-m2 {
-			label = "Back Paddle M2";
-			linux,code = <BTN_C>;
-			gpios = <&tlmm 7 GPIO_ACTIVE_LOW>;
-			debounce-interval = <15>;
-		};
-	};
-
-	&sound {
-	/* HDMI audio out over USB-C DP alt mode. The codec side is the
-	* hdmi-codec the DP bridge registers as a child of &mdss_dp0, and
-	* this link is also what makes the machine driver create the
-	* "DP0 Jack" control that UCM keys the HDMI device off.
-	* Needs the DISPLAY_PORT_RX_0 graph in the topology blob, see
-	* devices/SM8750/audio-topology/. */
-	dp-dai-link {
-		link-name = "DisplayPort Playback";
-		codec { sound-dai = <&mdss_dp0>; };
-		cpu { sound-dai = <&q6apmbedai DISPLAY_PORT_RX_0>; };
-		platform { sound-dai = <&q6apm>; };
-	};
-};
 };
