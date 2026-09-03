@@ -42,4 +42,4 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering and DP alt audio
 +			};
 +		};
 +	};
-};
+ };
