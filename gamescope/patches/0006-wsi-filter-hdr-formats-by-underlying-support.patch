@@ -7,7 +7,7 @@ format the driver will reject. Covers both surface-format entry points and
 preserves application-owned VkSurfaceFormat2KHR output headers.
 
 diff --git a/layer/VkLayer_FROG_gamescope_wsi.cpp b/layer/VkLayer_FROG_gamescope_wsi.cpp
-index af0c2009930bbdb986821906ffb2d6fec36a3d1f..6f98ef3bfab0fbee6191fa1594f39e9a96fc6de0 100644
+index 2a4b795..c6ca5b1 100644
 --- a/layer/VkLayer_FROG_gamescope_wsi.cpp
 +++ b/layer/VkLayer_FROG_gamescope_wsi.cpp
 @@ -3,6 +3,7 @@
@@ -18,7 +18,7 @@ index af0c2009930bbdb986821906ffb2d6fec36a3d1f..6f98ef3bfab0fbee6191fa1594f39e9a
  #include "vulkan_operators.hpp"
  #include "gamescope-swapchain-client-protocol.h"
  #include "../src/color_helpers.h"
-@@ -764,9 +765,9 @@ namespace GamescopeWSILayer {
+@@ -802,9 +803,9 @@ namespace GamescopeWSILayer {
      }
  
      static constexpr std::array<VkSurfaceFormat2KHR, 3> s_ExtraHDRSurfaceFormat2s = {{
@@ -31,10 +31,10 @@ index af0c2009930bbdb986821906ffb2d6fec36a3d1f..6f98ef3bfab0fbee6191fa1594f39e9a
      }};
  
      static constexpr auto s_ExtraHDRSurfaceFormats = []() {
-@@ -833,9 +833,22 @@ namespace GamescopeWSILayer {
+@@ -833,9 +834,22 @@ namespace GamescopeWSILayer {
            !(canBypass || gamescopeSurface->canBypassXWayland(true)))
          return pDispatch->GetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, selectedSurface, pSurfaceFormatCount, pSurfaceFormats);
-
+ 
 -      return vkroots::helpers::append(
 +      std::vector<VkSurfaceFormatKHR> underlyingSurfaceFormats;
 +      VkResult result = SurfaceFormatUtils::enumerate(
@@ -55,10 +55,10 @@ index af0c2009930bbdb986821906ffb2d6fec36a3d1f..6f98ef3bfab0fbee6191fa1594f39e9a
          pSurfaceFormatCount,
          pSurfaceFormats,
          physicalDevice,
-@@ -865,9 +872,22 @@ namespace GamescopeWSILayer {
+@@ -862,9 +876,22 @@ namespace GamescopeWSILayer {
            !(canBypass || gamescopeSurface->canBypassXWayland(true)))
          return pDispatch->GetPhysicalDeviceSurfaceFormats2KHR(physicalDevice, &surfaceInfo, pSurfaceFormatCount, pSurfaceFormats);
-
+ 
 -      return vkroots::helpers::append(
 +      std::vector<VkSurfaceFormat2KHR> underlyingSurfaceFormats;
 +      VkResult result = SurfaceFormatUtils::enumerate(
@@ -81,7 +81,7 @@ index af0c2009930bbdb986821906ffb2d6fec36a3d1f..6f98ef3bfab0fbee6191fa1594f39e9a
          physicalDevice,
 diff --git a/layer/surface_format_utils.hpp b/layer/surface_format_utils.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..f0cfa765346504a8274e9feb12bf3bfec81bfb68
+index 0000000..f0cfa76
 --- /dev/null
 +++ b/layer/surface_format_utils.hpp
 @@ -0,0 +1,132 @@
@@ -218,14 +218,13 @@ index 0000000000000000000000000000000000000000..f0cfa765346504a8274e9feb12bf3bfe
 +
 +}
 diff --git a/tests/meson.build b/tests/meson.build
-index 1cb18a7442cce09c0dee65989dd2a70a09795346..181cf0fbbacb360051c94e2d7e5486c26a5fbd80 100644
+index 9dedd0d..6dfc456 100644
 --- a/tests/meson.build
 +++ b/tests/meson.build
-@@ -15,4 +15,12 @@ gamescope_tests = executable(
-	cpp_args: gamescope_cpp_args,
- )
- test('convar', gamescope_tests, args: ['[convar]'])
- test('process', gamescope_tests, args: ['[process]'])
+@@ -21,3 +21,11 @@ test('convar', gamescope_tests, args: ['[convar]'])
+ test('utils/parsers', gamescope_tests, args: ['[parsers]'])
+ test('utils/process', gamescope_tests, args: ['[process]'], depends: [reaper_test_helper])
+ test('utils/string', gamescope_tests, args: ['[string]'])
 +
 +test_wsi_hdr_surface_formats = executable(
 +	'test_wsi_hdr_surface_formats',
@@ -236,7 +235,7 @@ index 1cb18a7442cce09c0dee65989dd2a70a09795346..181cf0fbbacb360051c94e2d7e5486c2
 +test('wsi-hdr-surface-formats', gamescope_tests)
 diff --git a/tests/test_wsi_hdr_surface_formats.cpp b/tests/test_wsi_hdr_surface_formats.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..e21b64a2ec7810764a862280db3d82a456529c9c
+index 0000000..e21b64a
 --- /dev/null
 +++ b/tests/test_wsi_hdr_surface_formats.cpp
 @@ -0,0 +1,128 @@

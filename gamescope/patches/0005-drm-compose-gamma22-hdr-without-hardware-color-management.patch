@@ -6,36 +6,36 @@ PQ layer targeting a PQ output. A Gamma 2.2 HDR panel needs the Vulkan
 color pipeline to map even a single PQ layer into its native encoding.
 
 diff --git a/src/Backends/DRMBackend.cpp b/src/Backends/DRMBackend.cpp
-index 99dd452cdb0215ac006363cdc2932cc4b107ea6b..927d01426926e1fb54cd065e85e32a9bc438a28f 100644
+index ca053ff..5a5b733 100644
 --- a/src/Backends/DRMBackend.cpp
 +++ b/src/Backends/DRMBackend.cpp
-@@ -29,6 +29,7 @@
+@@ -32,6 +32,7 @@
  
  #include "backend.h"
  #include "color_helpers.h"
 +#include "DRMComposition.h"
  #include "Utils/Defer.h"
- #include "drm_include.h"
- #include "edid.h"
-@@ -3580,8 +3581,13 @@ namespace gamescope
+ #include "Utils/Parsers.h"
+ #include "Utils/String.h"
+@@ -4274,8 +4275,13 @@ namespace gamescope
  			if ( g_bOutputHDREnabled )
  			{
  				bNeedsFullComposite |= g_bHDRItmEnable;
 -				if ( !SupportsColorManagement() )
--					bNeedsFullComposite |= ( pFrameInfo->layerCount > 1 || pFrameInfo->layers[0].colorspace != GAMESCOPE_APP_TEXTURE_COLORSPACE_HDR10_PQ );
+-					bNeedsFullComposite |= ( pFrameInfo->layers.count() > 1 || pFrameInfo->layers.get( 0 ).colorspace != GAMESCOPE_APP_TEXTURE_COLORSPACE_HDR10_PQ );
 +				const bool bSupportsHardwareColorManagement = SupportsColorManagement();
 +				bNeedsFullComposite |= DrmHdrOutputRequiresVulkanComposition(
 +					g_bOutputHDREnabled,
 +					bSupportsHardwareColorManagement,
 +					pFrameInfo->outputEncodingEOTF,
-+					pFrameInfo->layerCount,
-+					pFrameInfo->layers[0].colorspace == GAMESCOPE_APP_TEXTURE_COLORSPACE_HDR10_PQ );
++					pFrameInfo->layers.count(),
++					pFrameInfo->layers.get( 0 ).colorspace == GAMESCOPE_APP_TEXTURE_COLORSPACE_HDR10_PQ );
  			}
  			else
  			{
 diff --git a/src/Backends/DRMComposition.h b/src/Backends/DRMComposition.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..1210f78cf06c80a8161aea45eb82adc624c0bf5f
+index 0000000..1210f78
 --- /dev/null
 +++ b/src/Backends/DRMComposition.h
 @@ -0,0 +1,27 @@
@@ -67,21 +67,21 @@ index 0000000000000000000000000000000000000000..1210f78cf06c80a8161aea45eb82adc6
 +    }
 +}
 diff --git a/tests/meson.build b/tests/meson.build
-index 5a7a411beb3cac0c71813053b193c6574c5334e5..1cb18a7442cce09c0dee65989dd2a70a09795346 100644
+index 508039f..9dedd0d 100644
 --- a/tests/meson.build
 +++ b/tests/meson.build
 @@ -9,7 +9,7 @@ unittest_src += srcdir / 'edid.cpp'
  
  gamescope_tests = executable(
  	'gamescope_tests',
--	unittest_src + ['test_convar.cpp', 'test_process.cpp', 'test_display_lookup.cpp', 'test_edid.cpp'],
-+	unittest_src + ['test_convar.cpp', 'test_process.cpp', 'test_display_lookup.cpp', 'test_drm_composition.cpp', 'test_edid.cpp'],
+-	unittest_src + ['test_convar.cpp', 'test_process.cpp', 'test_utils_parsers.cpp', 'test_utils_string.cpp', 'test_display_lookup.cpp', 'test_edid.cpp'],
++	unittest_src + ['test_convar.cpp', 'test_process.cpp', 'test_utils_parsers.cpp', 'test_utils_string.cpp', 'test_display_lookup.cpp', 'test_drm_composition.cpp', 'test_edid.cpp'],
  	include_directories: [srcdir, sol2_include],
  	dependencies: [catch2_dep, luajit_dep, cap_dep, displayinfo_dep, drm_dep, glm_dep, wlroots_dep],
  	cpp_args: gamescope_cpp_args,
 diff --git a/tests/test_drm_composition.cpp b/tests/test_drm_composition.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..fc79946b4cec3f9f741b47d1af91c06212597d85
+index 0000000..fc79946
 --- /dev/null
 +++ b/tests/test_drm_composition.cpp
 @@ -0,0 +1,19 @@

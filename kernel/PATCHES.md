@@ -53,6 +53,15 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8550/patches/linux/0057_DDIC-CH13726A-panel.patch
   upstream: unknown
   notes: Retains additional compatibles and the 120 ms sleep-out delay, using Linux 7.2's managed DRM panel allocator.
+- `patches/0059-drm-panel-add-brightness-levels-helper.patch`
+  source: armada
+  upstream: not submitted
+- `patches/0060-drm-panel-icna35xx-luminance-linear-backlight-scale.patch`
+  source: armada
+  upstream: not submitted
+- `patches/0106-drm-panel-il97680a-luminance-linear-backlight-scale.patch`
+  source: armada
+  upstream: not submitted
 - `patches/0062-gpu-drm-panel-add-wt0630-panel.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8550/patches/linux/0062-gpu-drm-panel-add-wt0630-panel.patch
   upstream: https://lore.kernel.org/r/20260625-topic-sm8650-ayaneo-pocket-s2-r63419-v8-2-8570e692143e@linaro.org

@@ -77,6 +77,7 @@ EOF
       -e "/^%build$/i %global build_cflags %{build_cflags} ${ARMADA_MARCH}" \
       -e "/^%build$/i %global build_cxxflags %{build_cxxflags} ${ARMADA_MARCH}" \
       -e "s/^%autosetup\>/%autosetup -p1/" \
+      -e "s/pkgconfig(wayland-protocols) >= 1.17/pkgconfig(wayland-protocols) >= 1.22/" \
       -e "s/^%caps(cap_sys_nice=eip) %{_bindir}\/gamescope$/%{_bindir}\/gamescope/" \
       "${SPEC}"
 

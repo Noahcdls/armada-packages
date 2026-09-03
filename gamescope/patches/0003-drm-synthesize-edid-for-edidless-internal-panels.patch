@@ -8,10 +8,10 @@ no HDR) and feed it through the existing parser. Physical EDIDs stay
 preferred and unchanged; the synthetic EDID is never committed to KMS.
 
 diff --git a/src/Backends/DRMBackend.cpp b/src/Backends/DRMBackend.cpp
-index a7ee5fda3a7cb974258f3a9427f20c75e4d2a386..fb0407672b797ff30631e33bf9811b2f1aa99b3e 100644
+index 42f80fa..a40ccc2 100644
 --- a/src/Backends/DRMBackend.cpp
 +++ b/src/Backends/DRMBackend.cpp
-@@ -393,6 +393,7 @@ namespace gamescope
+@@ -417,6 +417,7 @@ namespace gamescope
  		const displaycolorimetry_t& GetDisplayColorimetry() const { return m_Mutable.DisplayColorimetry; }
  
  		std::span<const uint8_t> GetRawEDID() const override { return std::span<const uint8_t>{ m_Mutable.EdidData.begin(), m_Mutable.EdidData.end() }; }
@@ -19,7 +19,7 @@ index a7ee5fda3a7cb974258f3a9427f20c75e4d2a386..fb0407672b797ff30631e33bf9811b2f
  		bool HandleEdidChange()
  		{
  			bool bChanged = m_Mutable.bEdidChanged;
-@@ -514,7 +515,8 @@ namespace gamescope
+@@ -549,7 +550,8 @@ namespace gamescope
  			const char *pszMake = ""; // Not owned, no free. This is a pointer to pnp db or szMakePNP.
  			DRMModeGenerator fnDynamicModeGenerator;
  			std::vector<uint32_t> ValidDynamicRefreshRates{};
@@ -29,7 +29,7 @@ index a7ee5fda3a7cb974258f3a9427f20c75e4d2a386..fb0407672b797ff30631e33bf9811b2f
  			std::vector<BackendMode> BackendModes;
  			
  			displaycolorimetry_t DisplayColorimetry = displaycolorimetry_709;
-@@ -2267,20 +2269,54 @@ namespace gamescope
+@@ -2800,20 +2802,54 @@ namespace gamescope
  
  	void CDRMConnector::ParseEDID()
  	{
@@ -96,7 +96,7 @@ index a7ee5fda3a7cb974258f3a9427f20c75e4d2a386..fb0407672b797ff30631e33bf9811b2f
  		di_info *pInfo = di_info_parse_edid( m_Mutable.EdidData.data(), m_Mutable.EdidData.size() );
  		if ( !pInfo )
 diff --git a/src/edid.cpp b/src/edid.cpp
-index 6215829313a865d39e361c5d913747044237ef6f..4ecd80b18e8cb9d8bdd9cc0930a9708e77362636 100644
+index 6215829..4ecd80b 100644
 --- a/src/edid.cpp
 +++ b/src/edid.cpp
 @@ -4,8 +4,10 @@
@@ -224,7 +224,7 @@ index 6215829313a865d39e361c5d913747044237ef6f..4ecd80b18e8cb9d8bdd9cc0930a9708e
 +    }
  }
 diff --git a/src/edid.h b/src/edid.h
-index d0ed88f460d516374efa71e95d6393623e08ff7c..0cc7e74acc428f7faf91ca15a769115b4ae0b46e 100644
+index d0ed88f..0cc7e74 100644
 --- a/src/edid.h
 +++ b/src/edid.h
 @@ -9,9 +9,27 @@ namespace gamescope
@@ -258,7 +258,7 @@ index d0ed88f460d516374efa71e95d6393623e08ff7c..0cc7e74acc428f7faf91ca15a769115b
 \ No newline at end of file
 +}
 diff --git a/tests/meson.build b/tests/meson.build
-index c74aef1baf50681066cece2fc73dd74c835f5608..214bebdb07b6d5f20a0e5c11144530c7150d7b22 100644
+index e2667ea..f870d82 100644
 --- a/tests/meson.build
 +++ b/tests/meson.build
 @@ -5,12 +5,13 @@ unittest_src = []
@@ -269,17 +269,17 @@ index c74aef1baf50681066cece2fc73dd74c835f5608..214bebdb07b6d5f20a0e5c11144530c7
  
  gamescope_tests = executable(
  	'gamescope_tests',
--	unittest_src + ['test_convar.cpp', 'test_process.cpp'],
-+	unittest_src + ['test_convar.cpp', 'test_process.cpp', 'test_edid.cpp'],
+-	unittest_src + ['test_convar.cpp', 'test_process.cpp', 'test_utils_parsers.cpp', 'test_utils_string.cpp'],
++	unittest_src + ['test_convar.cpp', 'test_process.cpp', 'test_utils_parsers.cpp', 'test_utils_string.cpp', 'test_edid.cpp'],
  	include_directories: [srcdir, sol2_include],
 -	dependencies: [catch2_dep, luajit_dep, cap_dep, drm_dep, glm_dep, wlroots_dep],
 +	dependencies: [catch2_dep, luajit_dep, cap_dep, displayinfo_dep, drm_dep, glm_dep, wlroots_dep],
  	cpp_args: gamescope_cpp_args,
  )
- test('convar', gamescope_tests, args: ['[convar]'])
+ 
 diff --git a/tests/test_edid.cpp b/tests/test_edid.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..144111ec13f840f5b527895eae2c7581cf235959
+index 0000000..144111e
 --- /dev/null
 +++ b/tests/test_edid.cpp
 @@ -0,0 +1,136 @@
